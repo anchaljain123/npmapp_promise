@@ -1,0 +1,19 @@
+{
+  "name": "promise-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "anchjain <anchal.jain@tothenew.com>",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^0.22.0",
+    "feed-read": "0.0.1",
+    "file-system": "^2.2.2",
+    "request": "^2.81.0",
+    "xml2js": "^0.4.17",
+    "xml2json": "^0.11.0"
+  }
+}
