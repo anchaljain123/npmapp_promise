@@ -1,16 +1,61 @@
 var cheerio = require('cheerio');
+require('./config/data');
 var request = require('request');
 var async = require('async');
 xml2js = require('xml2js');
 var parser = new xml2js.Parser();
+var Feed = require('./api/users/user.model');
 var xmlData = {};
-var taskArray = [];
+var taskArray = [],taskArray1=[];
+
+
+function Insertfeeds(resultJson) {
+
+    return new Promise(function (resolve, reject) {
+
+        for (i in resultJson) {
+
+            resultJson[i].map( (item) => {
+
+                taskArray1.push((function (item) {
+                    //console.log("**************",item.rss.channel)
+
+                    return function (cb) {
+                        Feed.create(item.rss.channel, function (err, data) {
+                            if (err) {
+                                console.log("Somwthing went wrong in post ",err);
+                            }
+                            else {
+                                console.log(" Success ");
+                                cb(data)
+                            }
+
+                        })
+                    }
+
+
+                })(item))
+            })
+
+        }
+
+        async.series(taskArray1, function (err, finalResult) {
+
+            if(err)  reject('error');
+
+            console.log(finalResult.length,"============finalresult");
+
+            resolve('inserted into db');
+        })
+
+    })
+}
 
 function readAllFeeds(linksObj) { //reading all links and saving data
-                     var seriesArray = [],tempArray = [];;
+    var seriesArray = [],tempArray = [];
     return new Promise(function (resolve, reject) {
         for (i in linksObj) {
-            
+
             if (i == 'country') {
 
                 linksObj[i].map((item) => {
@@ -23,7 +68,7 @@ function readAllFeeds(linksObj) { //reading all links and saving data
                                 tempArray.push(body);
                                 xmlData['country']=tempArray;
                                 callback();
-                                // console.log(xmlData + "=========country result" + "\n");
+
                             })
                         }
                     })(item))
@@ -44,7 +89,7 @@ function readAllFeeds(linksObj) { //reading all links and saving data
 
                                 xmlData['series']=tempArray;
                                 callback();
-                                // console.log(xmlData + "=========series result" + "\n");
+
                             })
                         }
                     })(item))
@@ -63,7 +108,7 @@ function readAllFeeds(linksObj) { //reading all links and saving data
                                 topplayerArray.push(body);
                                 xmlData['topplayers'] = tempArray;
                                 callback();
-                                // console.log(xmlData + "=========topplyaer result" + "\n");
+
                             })
                         }
                     })(item))
@@ -72,9 +117,9 @@ function readAllFeeds(linksObj) { //reading all links and saving data
 
         }
 
-        //console.log('taskArray', taskArray);
+
         async.parallel(taskArray, function (err, finalResult) {
-            // console.log('finalResult is '+ "\n"+ xmlData+"\n");
+
             resolve(xmlData);
         })
 
@@ -83,36 +128,37 @@ function readAllFeeds(linksObj) { //reading all links and saving data
 
 var saveFeeds = function (data) {//parse xml to json
     var feedString = JSON.stringify(data);
-  //console.log(data.country.length,"====================Final Data")
-    var jsonData = [];
-    //console.log("---enter savefeeds--------------------------------------------------",data.country);
-    return new Promise(function (resolve, reject) {
-        //  console.log("---enter promise-----------------------------------------------",data.topplayers);
-       for (i in data) {
-          // console.log(i,": ---enter forloop----------------: ",data[i].length);
-                 for( j =0 ;j<10;j++) {
-                    //     console.log(data[i][j])
-             parser.parseString(data[i][j], function (err, result) {
 
+    var jsonDataObj = {},keys=0;
+
+    return new Promise(function (resolve, reject) {
+
+        for (i in data) {
+            keys++;
+            var jsonData =[];
+            for( j =0 ;j<10;j++) {
+
+                parser.parseString(data[i][j], function (err, result) {
                     if (err) console.log(err);
                     jsonData.push(result);
                 });
             }
+
+            jsonDataObj[i]=jsonData;
         }
 
-        console.log("**********************************",jsonData)
-        /* if (i == data.length) {
-         console.log( "%%%%%%%%%%% XML to JSON"); //country data
-         resolve(jsonData);
-         }  */
+
+        if (keys == 3) {
+            resolve(jsonDataObj);
+        }
     });
-    //  console.log("---end-----------------------------------------------------",data.series);
+
 };
 
 
 var prepareApiResponse = function (data) {
     var i = 0;
-  //  console.log(data, "---------------data");
+    // console.log(data, "---------------data");
 
     /*var promise = new Promise(function (resolve, reject) {
      if (typeof data[i] == "object")
@@ -147,7 +193,7 @@ function apiResponse(feed, resolve) {
     var countXml = 0
     if (typeof feed == "object") {
         countXml++;
-       // console.log(countXml, "!!!!!!!!!!!countresponse")
+        // console.log(countXml, "!!!!!!!!!!!countresponse")
         resolve(countXml);
     }
 
@@ -174,28 +220,29 @@ function apiController() {
         $('td li').each(function () {
             var href = $("a", this).attr('href');
             linksArray.push(href);
-
-            // linksArray[feedname[i]] = href;
         });
+
 
         linksObj['country'] = linksArray.slice(0, 10);
         linksObj['series'] = linksArray.slice(11, 20);
         linksObj['topplayers'] = linksArray.slice(20, 30);
 
-        // console.log(linksObj.series)
-
         readAllFeeds(linksObj)
             .then(saveFeeds)
-            .then(prepareApiResponse)
-            .then(sendApiResponse).then(function (result) {
-            console.log(result)
+            .then(function(result){
+                Insertfeeds(result)
+            })
+            .then(function (result) {
+                console.log("finished" + result)
+            }).catch(function (err) {
+            console.log(err)
         });
-
-        /*Promise.all([readAllFeeds(),saveFeeds(),prepareApiResponse(),sendApiResponse()]).then(function () {
-         console.log('finish');
-         })*/
-
     });
+    /*Promise.all([readAllFeeds(),saveFeeds(),prepareApiResponse(),sendApiResponse()]).then(function () {
+     console.log('finish');
+     })*/
+
+
 
 
 }
